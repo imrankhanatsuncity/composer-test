@@ -1,0 +1,17 @@
+{
+    "name": "imrankhanatsuncity/composer-test",
+    "description": "A simple hello world composer package",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Imran Khan",
+            "email": "imrankhanatsuncity@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "autoload": {
+        "psr-4": {"ImranK\\HelloWorld\\": "src/"}
+    },
+    "require": {}
+}
