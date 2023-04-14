@@ -1,0 +1,110 @@
+@startuml
+!theme aws-orange
+!include <awslib/AWSCommon.puml>
+!include <awslib/AWSSimplified.puml>
+!include <awslib/ApplicationIntegration/SimpleNotificationService.puml>
+!include <awslib/Compute/Lambda.puml>
+!include <awslib/Compute/EC2.puml>
+!include <awslib/Compute/EC2Instance.puml>
+!include <awslib/Compute/ElasticBeanstalkDeployment.puml>
+!include <awslib/Database/AuroraAmazonRDSInstance.puml>
+!include <awslib/Database/ElastiCacheElastiCacheforRedis.puml>
+!include <awslib/DeveloperTools/CodePipeline.puml>
+!include <awslib/Storage/SimpleStorageService.puml>
+!include <awslib/Storage/ElasticFileSystemFileSystem.puml>
+!include <awslib/ManagementGovernance/CloudFormation.puml>
+!include <awslib/NetworkingContentDelivery/VPCInternetGateway.puml>
+!include <awslib/Compute/EC2AutoScaling.puml>
+!include <awslib/NetworkingContentDelivery/ElasticLoadBalancingApplicationLoadBalancer.puml>
+!include <awslib/General/Users.puml>
+!include <awslib/Groups/all.puml>
+!include <cloudinsight/server>
+!include <tupadr3/common>
+!include <tupadr3/font-awesome-5/server>
+!include <tupadr3/font-awesome-5/github>
+!include <tupadr3/font-awesome-5/jira>
+
+skinparam rectangle {
+    BackgroundColor AWS_BG_COLOR
+    BorderColor transparent
+}
+
+node "GitHub Ecosystem" <<$github>> {
+    FA5_GITHUB(github, GitHub)
+    node Runners {
+        rectangle "<$server>\n Runner 1" as r1
+        rectangle "<$server>\n Runner 2" as r2
+        rectangle "<$server>\n Runner 3" as r3
+        rectangle "<$server>\n Runner 4" as r4
+        rectangle "<$server>\n Runner 5" as r5
+        rectangle "<$server>\n Runner N" as rn
+    }
+
+    github <--> Runners: On push, triggers GitHub Workflow action and update job status via webhook
+}
+
+
+Users(users, "Users", "millions of users")
+actor developer
+FA5_JIRA(jira, 'JIRA') #2684FF
+
+AWSCloudGroup(cloud) {
+    VPCGroup(vpc) {
+        SecurityGroupGroup(sg1) {
+            SimpleStorageService(s3_cp, 'CP Bucket', '')
+            CodePipeline(cp, 'CodePipeline', '')
+
+            cp <--> s3_cp
+        }
+        SecurityGroupGroup(sg2) {
+            EC2Instance(mongo, 'Mongo Db', '')
+            AuroraAmazonRDSInstance(rds, 'MySql', '')
+            ElastiCacheElastiCacheforRedis(cache, 'Redis', '')
+            ElasticFileSystemFileSystem(efs, 'EFS', '')
+        }
+        ElasticBeanstalkContainerGroup(ebc, 'Beanstalk Container') {
+            SecurityGroupGroup(sg) {
+                VPCInternetGateway(ig, 'Internet Gateway', '')
+                ElasticBeanstalkDeployment(eb, 'Beanstalk', '')
+                SimpleStorageService(s3_eb, 'EB Bucket', '')
+                ElasticLoadBalancingApplicationLoadBalancer(alb, 'ALB', '') {
+                    AutoScalingGroupGroup(asg, '') {
+                        EC2(ec2, Instances, '')
+                    }
+
+                    alb <--> ec2
+                }
+
+                ig <--> alb
+            }
+        }
+        SimpleStorageService(s3, 'App S3 Bucket', '')
+        Lambda(lambda, 'Lambda', '')
+        SimpleNotificationService(sns, 'SNS', '')
+        sg <.r.> sg2
+        ec2 <-- s3_eb
+        ec2 <--> mongo
+        ec2 <--> rds
+        ec2 <--> cache
+        ec2 <--> efs
+        ec2 <--> s3
+        cp --> s3_eb
+        cp --> eb: Start deployment
+        eb <--> s3_eb
+        eb <--> ec2
+        eb --> cp: After deployment finished (Success/Fail both)\n Notify CodePipeline
+        cp --> sns: Push notification payload to SNS topic
+        sns --> lambda: Trigger Lambda function
+    }
+}
+
+developer <-- jira: task/issue is assigned to developer
+developer --> github: developer creates branch specific to assigned JIRA task/issue key
+developer ..> s3: Upload config files to S3 if any
+developer --> github: Commit Code and Push Branch.\nCreate Pull Request
+github --> jira: On Code Push, Update JIRA Task/Issue based on "Commit Message"
+developer --> github: Merge pull request if passed checks
+github --> cp: Trigger CodePipeline
+lambda --> github: Send notification to GitHub about deployment
+users <--> ig
+@enduml
